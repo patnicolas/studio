@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vector Field Studio</title>
+  <!-- Fast, reliable Math.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjs@12.4.2/lib/browser/math.js"></script>
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --panel-bg: rgba(18, 24, 38, 0.92);
+      --border-color: rgba(255, 255, 255, 0.12);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #f89540;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      overflow: hidden;
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    /* Floating UI Panel */
+    #ui-panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 320px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    select, input[type="text"] {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-main);
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      font-family: "Fira Code", monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    /* Real-Time Probe Card */
+    #probe-card {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.78rem;
+      font-family: "Fira Code", monospace;
+      line-height: 1.5;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .probe-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .probe-val {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="viewport"></canvas>
+
+    <div id="ui-panel">
+      <h1>Vector Field Studio</h1>
+
+      <!-- Presets -->
+      <div class="form-group">
+        <label for="preset-select">Preset Field</label>
+        <select id="preset-select">
+          <option value="sink_vortex">Sink Vortex</option>
+          <option value="saddle">Hyperbolic Saddle</option>
+          <option value="source">Radial Source</option>
+          <option value="van_der_pol">Van der Pol Oscillator</option>
+          <option value="dipole">Dipole Flow</option>
+        </select>
+      </div>
+
+      <!-- Formula Inputs -->
+      <div class="form-group">
+        <label for="fx-input">V_x(x, y)</label>
+        <input type="text" id="fx-input" value="-y - 0.2 * x" />
+      </div>
+
+      <div class="form-group">
+        <label for="fy-input">V_y(x, y)</label>
+        <input type="text" id="fy-input" value="x - 0.2 * y" />
+      </div>
+
+      <!-- Point Probe -->
+      <div id="probe-card">
+        <div class="probe-row">
+          <span>Coords (x, y):</span>
+          <span id="probe-coord" class="probe-val">(0.00, 0.00)</span>
+        </div>
+        <div class="probe-row">
+          <span>Magnitude |V|:</span>
+          <span id="probe-mag" class="probe-val">0.00</span>
+        </div>
+        <div class="probe-row">
+          <span>Divergence (∇·V):</span>
+          <span id="probe-div" class="probe-val">0.00</span>
+        </div>
+        <div class="probe-row">
+          <span>Curl (∇×V):</span>
+          <span id="probe-curl" class="probe-val">0.00</span>
+        </div>
+      </div>
+
+      <div class="hint">Click or drag anywhere on canvas to inject particles</div>
+    </div>
+  </div>
+
+  <script>
+    // --- Canvas & Resize Setup ---
+    const canvas = document.getElementById("viewport");
+    const ctx = canvas.getContext("2d");
+
+    let width = 0;
+    let height = 0;
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      initGrid();
+    }
+
+    // View scale: [-scale, scale]
+    const scale = 3.5;
+    function toScreenX(x) { return (x / scale + 1) * 0.5 * width; }
+    function toScreenY(y) { return (-y / scale + 1) * 0.5 * height; }
+    function toMathX(px) { return ((px / width) * 2 - 1) * scale; }
+    function toMathY(py) { return -((py / height) * 2 - 1) * scale; }
+
+    // --- Matplotlib Plasma Palette Interpolation ---
+    const PLASMA_STOPS = [
+      [13, 8, 135],    // 0.00: Deep Violet
+      [84, 2, 163],    // 0.20: Indigo
+      [156, 23, 158],  // 0.40: Magenta
+      [204, 71, 120],  // 0.60: Rose
+      [237, 121, 83],  // 0.75: Orange
+      [251, 182, 54],  // 0.90: Warm Yellow
+      [240, 249, 33]   // 1.00: Bright Yellow
+    ];
+
+    function getPlasmaColor(t) {
+      t = Math.max(0, Math.min(1, isNaN(t) ? 0 : t));
+      const pos = t * (PLASMA_STOPS.length - 1);
+      const idx = Math.floor(pos);
+      const frac = pos - idx;
+
+      if (idx >= PLASMA_STOPS.length - 1) {
+        const c = PLASMA_STOPS[PLASMA_STOPS.length - 1];
+        return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+      }
+
+      const c1 = PLASMA_STOPS[idx];
+      const c2 = PLASMA_STOPS[idx + 1];
+      const r = Math.round(c1[0] + frac * (c2[0] - c1[0]));
+      const g = Math.round(c1[1] + frac * (c2[1] - c1[1]));
+      const b = Math.round(c1[2] + frac * (c2[2] - c1[2]));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // --- Parser with Native Fallback (Safe offline execution) ---
+    let evaluatorVx = (x, y) => -y - 0.2 * x;
+    let evaluatorVy = (x, y) => x - 0.2 * y;
+
+    function buildEvaluator(str) {
+      // 1. Try math.js if loaded via CDN
+      if (typeof math !== "undefined" && math.compile) {
+        try {
+          const compiled = math.compile(str);
+          return (x, y) => {
+            const v = compiled.evaluate({ x, y });
+            return Number.isFinite(v) ? v : 0;
+          };
+        } catch (e) {
+          console.warn("Math.js compile failed, falling back", e);
+        }
+      }
+
+      // 2. Safe standalone JavaScript Function fallback
+      try {
+        let sanitized = str
+          .replace(/\^/g, "**")
+          .replace(/\bsin\b/g, "Math.sin")
+          .replace(/\bcos\b/g, "Math.cos")
+          .replace(/\btan\b/g, "Math.tan")
+          .replace(/\bexp\b/g, "Math.exp")
+          .replace(/\bsqrt\b/g, "Math.sqrt")
+          .replace(/\babs\b/g, "Math.abs");
+        const fn = new Function("x", "y", `"use strict"; return (${sanitized});`);
+        return (x, y) => {
+          try {
+            const v = fn(x, y);
+            return Number.isFinite(v) ? v : 0;
+          } catch {
+            return 0;
+          }
+        };
+      } catch (err) {
+        return (x, y) => 0;
+      }
+    }
+
+    function updateEquations() {
+      const fxStr = document.getElementById("fx-input").value;
+      const fyStr = document.getElementById("fy-input").value;
+      evaluatorVx = buildEvaluator(fxStr);
+      evaluatorVy = buildEvaluator(fyStr);
+    }
+
+    function evaluateField(x, y) {
+      return [evaluatorVx(x, y), evaluatorVy(x, y)];
+    }
+
+    // --- Quiver Grid Setup ---
+    let gridPoints = [];
+    const GRID_SPACING_PX = 46;
+
+    function initGrid() {
+      gridPoints = [];
+      for (let px = GRID_SPACING_PX / 2; px < width; px += GRID_SPACING_PX) {
+        for (let py = GRID_SPACING_PX / 2; py < height; py += GRID_SPACING_PX) {
+          gridPoints.push({ px, py });
+        }
+      }
+    }
+
+    // --- Stream Particles (Midpoint Integration) ---
+    const NUM_PARTICLES = 360;
+    const particles = [];
+
+    function resetParticle(p) {
+      p.x = (Math.random() * 2 - 1) * scale;
+      p.y = (Math.random() * 2 - 1) * scale;
+      p.life = Math.floor(Math.random() * 100) + 40;
+    }
+
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      const p = {};
+      resetParticle(p);
+      particles.push(p);
+    }
+
+    // --- Render Loop ---
+    let maxSpeedObserved = 1.0;
+
+    function render() {
+      // Trail effect
+      ctx.fillStyle = "rgba(11, 15, 25, 0.22)";
+      ctx.fillRect(0, 0, width, height);
+
+      // 1. Draw Quiver Vectors
+      let frameMaxSpeed = 0.001;
+      const arrowLength = GRID_SPACING_PX * 0.44;
+
+      for (let i = 0; i < gridPoints.length; i++) {
+        const pt = gridPoints[i];
+        const mx = toMathX(pt.px);
+        const my = toMathY(pt.py);
+        const [vx, vy] = evaluateField(mx, my);
+        const speed = Math.hypot(vx, vy);
+
+        if (speed > frameMaxSpeed) frameMaxSpeed = speed;
+
+        if (speed > 1e-4) {
+          const normVx = vx / speed;
+          const normVy = vy / speed;
+
+          const color = getPlasmaColor(speed / (maxSpeedObserved || 1));
+          ctx.strokeStyle = color;
+          ctx.fillStyle = color;
+          ctx.lineWidth = 1.3;
+
+          const endX = pt.px + normVx * arrowLength;
+          const endY = pt.py - normVy * arrowLength;
+
+          // Shaft
+          ctx.beginPath();
+          ctx.moveTo(pt.px, pt.py);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          // Arrowhead
+          const headLen = 4;
+          const angle = Math.atan2(-normVy, normVx);
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - headLen * Math.cos(angle - Math.PI / 6),
+            endY - headLen * Math.sin(angle - Math.PI / 6)
+          );
+          ctx.lineTo(
+            endX - headLen * Math.cos(angle + Math.PI / 6),
+            endY - headLen * Math.sin(angle + Math.PI / 6)
+          );
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      maxSpeedObserved = maxSpeedObserved * 0.95 + frameMaxSpeed * 0.05;
+
+      // 2. Draw Moving Streamline Particles
+      const dt = 0.025;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        const [k1x, k1y] = evaluateField(p.x, p.y);
+        const midX = p.x + 0.5 * dt * k1x;
+        const midY = p.y + 0.5 * dt * k1y;
+        const [k2x, k2y] = evaluateField(midX, midY);
+
+        const nextX = p.x + dt * k2x;
+        const nextY = p.y + dt * k2y;
+
+        const speed = Math.hypot(k2x, k2y);
+        ctx.strokeStyle = getPlasmaColor(speed / (maxSpeedObserved || 1));
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(p.x), toScreenY(p.y));
+        ctx.lineTo(toScreenX(nextX), toScreenY(nextY));
+        ctx.stroke();
+
+        p.x = nextX;
+        p.y = nextY;
+        p.life--;
+
+        if (p.life <= 0 || Math.abs(p.x) > scale || Math.abs(p.y) > scale) {
+          resetParticle(p);
+        }
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // --- Interactive Mouse Probe & Injection ---
+    let mousePos = { x: 0, y: 0 };
+    let isMouseDown = false;
+
+    function injectParticles(mx, my) {
+      for (let i = 0; i < 10; i++) {
+        const p = particles[Math.floor(Math.random() * particles.length)];
+        p.x = mx + (Math.random() - 0.5) * 0.3;
+        p.y = my + (Math.random() - 0.5) * 0.3;
+        p.life = 120;
+      }
+    }
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const mx = toMathX(px);
+      const my = toMathY(py);
+      mousePos = { x: mx, y: my };
+
+      if (isMouseDown) injectParticles(mx, my);
+
+      // Central differences for divergence & curl
+      const eps = 1e-4;
+      const [vx, vy] = evaluateField(mx, my);
+      const mag = Math.hypot(vx, vy);
+
+      const [vx_px] = evaluateField(mx + eps, my);
+      const [vx_mx] = evaluateField(mx - eps, my);
+      const [, vy_py] = evaluateField(mx, my + eps);
+      const [, vy_my] = evaluateField(mx, my - eps);
+      const div = (vx_px - vx_mx) / (2 * eps) + (vy_py - vy_my) / (2 * eps);
+
+      const [, vy_px] = evaluateField(mx + eps, my);
+      const [, vy_mx] = evaluateField(mx - eps, my);
+      const [vx_py] = evaluateField(mx, my + eps);
+      const [vx_my] = evaluateField(mx, my - eps);
+      const curl = (vy_px - vy_mx) / (2 * eps) - (vx_py - vx_my) / (2 * eps);
+
+      document.getElementById("probe-coord").innerText = `(${mx.toFixed(2)}, ${my.toFixed(2)})`;
+      document.getElementById("probe-mag").innerText = mag.toFixed(3);
+      document.getElementById("probe-div").innerText = div.toFixed(3);
+      document.getElementById("probe-curl").innerText = curl.toFixed(3);
+    });
+
+    canvas.addEventListener("mousedown", (e) => {
+      isMouseDown = true;
+      injectParticles(mousePos.x, mousePos.y);
+    });
+    window.addEventListener("mouseup", () => { isMouseDown = false; });
+
+    // --- Preset Switcher ---
+    const PRESETS = {
+      sink_vortex: { fx: "-y - 0.2 * x", fy: "x - 0.2 * y" },
+      saddle: { fx: "x", fy: "-y" },
+      source: { fx: "x", fy: "y" },
+      van_der_pol: { fx: "y", fy: "1.2 * (1 - x^2) * y - x" },
+      dipole: {
+        fx: "(x - 1)/((x - 1)^2 + y^2 + 0.1) - (x + 1)/((x + 1)^2 + y^2 + 0.1)",
+        fy: "y/((x - 1)^2 + y^2 + 0.1) - y/((x + 1)^2 + y^2 + 0.1)"
+      }
+    };
+
+    document.getElementById("preset-select").addEventListener("change", (e) => {
+      const preset = PRESETS[e.target.value];
+      if (preset) {
+        document.getElementById("fx-input").value = preset.fx;
+        document.getElementById("fy-input").value = preset.fy;
+        updateEquations();
+      }
+    });
+
+    document.getElementById("fx-input").addEventListener("input", updateEquations);
+    document.getElementById("fy-input").addEventListener("input", updateEquations);
+    window.addEventListener("resize", resize);
+
+    // Initial Start
+    resize();
+    updateEquations();
+    render();
+  </script>
+</body>
+</html>
