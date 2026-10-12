@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frozen Lake RL Studio</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ice: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              800: '#075985',
+              900: '#0c4a6e',
+              950: '#082f49'
+            },
+            frost: '#38bdf8',
+            deepWater: '#031926'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 24px -4px rgba(56, 189, 248, 0.3);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-cyan-500/30 selection:text-cyan-200 flex flex-col overflow-x-hidden">
+
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-black/20">
+    <div class="flex items-center space-x-3.5">
+      <div class="flex items-center shrink-0">
+        <img src="../images/logo.png"  alt="Geometric Deep Learning Logo" />
+      </div>
+      <div class="border-l border-slate-800 pl-3">
+        <h1 class="text-xl md:text-2xl lg:text-3xl  font-bold tracking-tight bg-gradient-to-r from-cyan-300 via-sky-200 to-white bg-clip-text text-transparent flex items-center gap-2">
+          Geometric World Models - Frozen Lake Studio
+        </h1>
+      </div>
+    </div>
+
+    <!-- Quick Metrics Top Banner -->
+    <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs font-mono">
+      <div class="bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2 shadow-inner">
+        <span class="text-slate-400">Episode:</span>
+        <span id="metric-episodes" class="text-cyan-400 font-bold">0</span>
+      </div>
+      <div class="bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2 shadow-inner">
+        <span class="text-slate-400">Success Rate:</span>
+        <span id="metric-success" class="text-emerald-400 font-bold">0.0%</span>
+      </div>
+      <div class="bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2 shadow-inner">
+        <span class="text-slate-400">Avg Steps:</span>
+        <span id="metric-avg-steps" class="text-amber-400 font-bold">0.0</span>
+      </div>
+      <div class="bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2 shadow-inner">
+        <span class="text-slate-400">&epsilon;:</span>
+        <span id="metric-epsilon" class="text-purple-400 font-bold">1.000</span>
+      </div>
+      <div class="bg-slate-800/90 border border-slate-700/60 rounded-lg px-3 py-1 flex items-center gap-2 shadow-inner">
+        <span class="text-slate-400">Total Steps:</span>
+        <span id="metric-total-steps" class="text-blue-300 font-bold">0</span>
+      </div>
+
+      <!-- Audio Toggle Button -->
+      <button id="btn-toggle-sound" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 border border-slate-700 transition" title="Toggle Sound FX">
+        <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+        </svg>
+        <svg id="icon-sound-off" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z m12.414-4.586l-4.243 4.243m0-4.243l4.243 4.243"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-[1680px] w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- LEFT COLUMN: Execution Controls & Hyperparameters (3 cols) -->
+    <aside class="lg:col-span-3 flex flex-col gap-4 order-2 lg:order-1">
+      
+      <!-- Execution Control Card -->
+      <div class="glass-panel rounded-2xl p-4 shadow-xl flex flex-col gap-3.5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Execution Controls
+          </h2>
+          <span id="agent-status-tag" class="text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-emerald-950/80 border border-emerald-700/60 text-emerald-400">Ready</span>
+        </div>
+
+        <div class="bg-slate-900/70 border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span class="text-[11px] text-slate-400">Algorithm</span>
+          <span class="text-xs font-semibold text-cyan-300 font-mono">Q-Learning (Off-Policy TD)</span>
+        </div>
+
+        <!-- Action / Step Controls -->
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-agent-step" class="bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+            Single Step
+          </button>
+          <button id="btn-run-episode" class="bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/40 text-sky-200 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+            1 Episode
+          </button>
+        </div>
+
+        <!-- Continuous Training Controls -->
+        <div class="space-y-2">
+          <button id="btn-toggle-train" class="w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-600/30 active:scale-98 transition flex items-center justify-center gap-2">
+            <svg id="icon-train-play" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+            <svg id="icon-train-pause" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+            <span id="label-train-btn">Start Auto-Train</span>
+          </button>
+
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="btn-train-100" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg py-1.5 text-[11px] font-mono text-slate-300 transition">+100 Ep</button>
+            <button id="btn-train-500" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg py-1.5 text-[11px] font-mono text-slate-300 transition">+500 Ep</button>
+            <button id="btn-train-1000" class="bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg py-1.5 text-[11px] font-mono text-slate-300 transition">+1000 Ep</button>
+          </div>
+        </div>
+
+        <!-- Greedy Test / Reset -->
+        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+          <button id="btn-test-greedy" class="bg-amber-600/20 hover:bg-amber-600/35 border border-amber-500/40 text-amber-200 py-1.5 rounded-xl text-xs font-medium transition active:scale-95" title="Run 1 episode using pure exploitation (epsilon=0)">
+            Eval Policy (&epsilon;=0)
+          </button>
+          <button id="btn-reset-agent" class="bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/50 text-rose-300 py-1.5 rounded-xl text-xs font-medium transition active:scale-95">
+            Reset Learning
+          </button>
+        </div>
+
+        <!-- Simulation Speed -->
+        <div class="pt-2">
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>Visual Delay</span>
+            <span id="speed-label" class="font-mono text-cyan-400">Fast (40ms)</span>
+          </div>
+          <input id="slider-speed" type="range" min="0" max="250" value="40" step="5" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+        </div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center justify-between border-b border-slate-800 pb-2">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Hyperparameters
+          </span>
+          <button id="btn-reset-hyper" class="text-[10px] text-slate-400 hover:text-cyan-400 transition underline lowercase">defaults</button>
+        </h2>
+
+        <!-- Alpha (Learning Rate) -->
+        <div>
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-400">Learning Rate (&alpha;)</span>
+            <span id="val-alpha" class="font-mono text-cyan-400">0.80</span>
+          </div>
+          <input id="slider-alpha" type="range" min="0.01" max="1.0" step="0.01" value="0.80" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+        </div>
+
+        <!-- Gamma (Discount Factor) -->
+        <div>
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-400">Discount Factor (&gamma;)</span>
+            <span id="val-gamma" class="font-mono text-sky-400">0.95</span>
+          </div>
+          <input id="slider-gamma" type="range" min="0.5" max="0.999" step="0.005" value="0.95" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500">
+        </div>
+
+        <!-- Epsilon Initial & Decay -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-400">Decay Rate</span>
+              <span id="val-decay" class="font-mono text-purple-400">0.995</span>
+            </div>
+            <input id="slider-decay" type="range" min="0.900" max="0.999" step="0.001" value="0.995" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500">
+          </div>
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-400">Min &epsilon;</span>
+              <span id="val-min-eps" class="font-mono text-purple-400">0.01</span>
+            </div>
+            <input id="slider-min-eps" type="range" min="0.00" max="0.20" step="0.01" value="0.01" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500">
+          </div>
+        </div>
+
+        <!-- Slippery Physics Toggle (default enabled) -->
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/70 border border-slate-700/60 mt-1">
+          <div>
+            <span class="text-xs font-medium text-slate-200 block">Slippery Physics</span>
+            <span class="text-[10px] text-slate-400">1/3 intended, 2/3 orthogonal slips</span>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input id="toggle-slippery" type="checkbox" checked class="sr-only peer">
+            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+          </label>
+        </div>
+
+        <!-- Reward Settings -->
+        <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 text-[10px]">
+          <div>
+            <label class="text-slate-400 block mb-0.5">Goal (G)</label>
+            <input id="input-rew-goal" type="number" step="0.5" value="1.0" class="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-center font-mono text-emerald-400">
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-0.5">Hole (H)</label>
+            <input id="input-rew-hole" type="number" step="0.1" value="0.0" class="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-center font-mono text-rose-400">
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-0.5">Step (F)</label>
+            <input id="input-rew-step" type="number" step="0.01" value="0.00" class="w-full bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-center font-mono text-slate-300">
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="lg:col-span-6 flex flex-col gap-3 order-1 lg:order-2">
+      
+      <!-- Lake Viewport Header & Overlays Toggle -->
+      <div class="glass-panel rounded-2xl p-3 shadow-xl flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-200">Classic 8&times;8 Lake Canvas</span>
+          <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/40">64 States &bull; Slippery Ice</span>
+        </div>
+
+        <!-- Visual Layer Checkboxes (Q-Values removed) -->
+        <div class="flex items-center gap-4 text-xs">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-cyan-300 select-none">
+            <input id="layer-heatmap" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-0">
+            <span>Value Heatmap V(s)</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-cyan-300 select-none">
+            <input id="layer-arrows" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-0">
+            <span>Policy Vector (&pi;)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Main Canvas Container -->
+      <div class="glass-panel rounded-2xl p-2 sm:p-3 shadow-2xl relative flex flex-col items-center justify-center min-h-[460px] bg-slate-950/80 overflow-hidden border border-cyan-500/20 glow-cyan">
+        
+        <!-- Slip Alert Overlay Badge -->
+        <div id="slip-indicator" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2 bg-amber-500/90 text-slate-950 font-black text-xs px-3 py-1 rounded-full shadow-lg border border-amber-200 flex items-center gap-1.5 uppercase tracking-wide">
+          <svg class="w-3.5 h-3.5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          Whoosh! Slipped sideways!
+        </div>
+
+        <canvas id="lakeCanvas" class="w-full max-w-[560px] aspect-square rounded-xl shadow-inner cursor-pointer touch-none"></canvas>
+
+        <!-- Touch / Manual Navigation D-Pad & Controls -->
+        <div class="mt-3 w-full flex flex-wrap items-center justify-between px-2 gap-2 text-xs">
+          <div class="text-[11px] text-slate-400 hidden sm:block">
+            Controls: <span class="text-cyan-300 font-mono font-semibold">&larr; &uarr; &darr; &rarr;</span> / <span class="text-cyan-300 font-mono font-semibold">WASD</span>
+          </div>
+
+          <!-- D-Pad Control on Canvas bottom -->
+          <div class="flex items-center gap-1 mx-auto sm:mx-0">
+            <span class="text-[11px] text-slate-400 mr-1">Manual Step:</span>
+            <button id="btn-manual-left" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-600 border border-slate-700 hover:border-cyan-400 flex items-center justify-center text-slate-200 transition active:scale-90" title="Move Left">&larr;</button>
+            <button id="btn-manual-down" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-600 border border-slate-700 hover:border-cyan-400 flex items-center justify-center text-slate-200 transition active:scale-90" title="Move Down">&darr;</button>
+            <button id="btn-manual-up" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-600 border border-slate-700 hover:border-cyan-400 flex items-center justify-center text-slate-200 transition active:scale-90" title="Move Up">&uarr;</button>
+            <button id="btn-manual-right" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-600 border border-slate-700 hover:border-cyan-400 flex items-center justify-center text-slate-200 transition active:scale-90" title="Move Right">&rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Learning Performance Curve Canvas -->
+      <div class="glass-panel rounded-2xl p-3.5 shadow-xl flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Success Rate Trend (Rolling 100 Episodes)</h3>
+          </div>
+          <span id="chart-latest-val" class="font-mono text-xs font-bold text-emerald-400">0.0%</span>
+        </div>
+        <div class="h-28 w-full relative">
+          <canvas id="chartCanvas" class="w-full h-full rounded-lg bg-slate-900/60 border border-slate-800"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <aside class="lg:col-span-3 flex flex-col gap-4 order-3">
+
+      <!-- Tile / State Q-Value Inspector Card -->
+      <div class="glass-panel rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            State Inspector
+          </h2>
+          <span id="inspect-coord" class="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Tile: (0, 0)</span>
+        </div>
+
+        <div class="flex items-center justify-between text-xs">
+          <div>
+            <span class="text-slate-400 text-[11px]">Tile Type:</span>
+            <span id="inspect-type" class="font-semibold text-emerald-400 ml-1">Start (S)</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[11px]">V(s) = max Q:</span>
+            <span id="inspect-v" class="font-mono font-bold text-cyan-300 ml-1">0.000</span>
+          </div>
+        </div>
+
+        <!-- 4-Way Compass / Action Values Breakdown -->
+        <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 space-y-2">
+          <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Action Values Q(s, a) &amp; Softmax Probabilities</div>
+
+          <!-- UP -->
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-slate-800 flex items-center justify-center text-[10px] text-cyan-400">&uarr;</span>
+              Up (3):
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="q-up-val" class="text-slate-200">0.000</span>
+              <span id="q-up-prob" class="text-[10px] text-slate-500 w-10 text-right">25%</span>
+            </div>
+          </div>
+
+          <!-- RIGHT -->
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-slate-800 flex items-center justify-center text-[10px] text-cyan-400">&rarr;</span>
+              Right (2):
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="q-right-val" class="text-slate-200">0.000</span>
+              <span id="q-right-prob" class="text-[10px] text-slate-500 w-10 text-right">25%</span>
+            </div>
+          </div>
+
+          <!-- DOWN -->
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-slate-800 flex items-center justify-center text-[10px] text-cyan-400">&darr;</span>
+              Down (1):
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="q-down-val" class="text-slate-200">0.000</span>
+              <span id="q-down-prob" class="text-[10px] text-slate-500 w-10 text-right">25%</span>
+            </div>
+          </div>
+
+          <!-- LEFT -->
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-slate-800 flex items-center justify-center text-[10px] text-cyan-400">&larr;</span>
+              Left (0):
+            </span>
+            <div class="flex items-center gap-2">
+              <span id="q-left-val" class="text-slate-200">0.000</span>
+              <span id="q-left-prob" class="text-[10px] text-slate-500 w-10 text-right">25%</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-400 italic leading-relaxed">
+          Hover or click any cell on the 8&times;8 frozen grid to inspect its action values and optimal directional choice.
+        </p>
+
+        <!-- Quick Export -->
+        <button id="btn-export-q" class="w-full mt-2 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-300 transition">
+          Export Q-Table (JSON)
+        </button>
+      </div>
+
+    </aside>
+  </main>
+
+  <script>
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playStep() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, this.ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      }
+      playSlip() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(580, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      }
+      playHole() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(45, this.ctx.currentTime + 0.28);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.28);
+      }
+      playGoal() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.08);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.08);
+          osc.stop(this.ctx.currentTime + idx * 0.08 + 0.25);
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    const CLASSIC_8X8_MAP = [
+      'SFFFFFFF',
+      'FFFFFFFF',
+      'FFFHFFFF',
+      'FFFFFHFF',
+      'FFFHFFFF',
+      'FHHFFFHF',
+      'FHFFHFHF',
+      'FFFHFFFG'
+    ];
+
+    /* Actions definition matching Gym standard: 0: LEFT, 1: DOWN, 2: RIGHT, 3: UP */
+    const ACTIONS = { LEFT: 0, DOWN: 1, RIGHT: 2, UP: 3 };
+    const ACTION_DELTAS = [
+      { r: 0, c: -1 }, // Left
+      { r: 1, c: 0 },  // Down
+      { r: 0, c: 1 },  // Right
+      { r: -1, c: 0 }  // Up
+    ];
+
+    class FrozenLakeEnv {
+      constructor(mapArray, isSlippery = true) {
+        this.setMap(mapArray);
+        this.isSlippery = isSlippery;
+        this.rewardGoal = 1.0;
+        this.rewardHole = 0.0;
+        this.rewardStep = 0.0;
+        this.reset();
+      }
+
+      setMap(mapArray) {
+        this.grid = mapArray.map(row => row.split(''));
+        this.rows = this.grid.length;
+        this.cols = this.grid[0].length;
+        this.nStates = this.rows * this.cols;
+        this.nActions = 4;
+
+        this.startPos = { r: 0, c: 0 };
+        this.goalPos = { r: this.rows - 1, c: this.cols - 1 };
+
+        for (let r = 0; r < this.rows; r++) {
+          for (let c = 0; c < this.cols; c++) {
+            if (this.grid[r][c] === 'S') this.startPos = { r, c };
+            if (this.grid[r][c] === 'G') this.goalPos = { r, c };
+          }
+        }
+      }
+
+      stateToCoord(s) {
+        return { r: Math.floor(s / this.cols), c: s % this.cols };
+      }
+
+      coordToState(r, c) {
+        return r * this.cols + c;
+      }
+
+      reset() {
+        this.agentPos = { ...this.startPos };
+        this.agentState = this.coordToState(this.agentPos.r, this.agentPos.c);
+        this.done = false;
+        this.lastSlip = false;
+        return this.agentState;
+      }
+
+      // Step function with authentic Gymnasium stochastic slippery ice dynamics
+      step(action) {
+        if (this.done) return { state: this.agentState, reward: 0, done: true, slipped: false };
+
+        let actualAction = action;
+        let slipped = false;
+
+        if (this.isSlippery) {
+          // 1/3 intended, 1/3 left orthogonal, 1/3 right orthogonal
+          const rand = Math.random();
+          if (rand < 1/3) {
+            actualAction = (action - 1 + 4) % 4; // Orthogonal Left
+            slipped = true;
+          } else if (rand < 2/3) {
+            actualAction = action; // Intended
+            slipped = false;
+          } else {
+            actualAction = (action + 1) % 4; // Orthogonal Right
+            slipped = true;
+          }
+        }
+
+        const delta = ACTION_DELTAS[actualAction];
+        let nextR = Math.min(Math.max(this.agentPos.r + delta.r, 0), this.rows - 1);
+        let nextC = Math.min(Math.max(this.agentPos.c + delta.c, 0), this.cols - 1);
+
+        this.agentPos = { r: nextR, c: nextC };
+        this.agentState = this.coordToState(nextR, nextC);
+        this.lastSlip = slipped;
+
+        const tile = this.grid[nextR][nextC];
+        let reward = this.rewardStep;
+        let done = false;
+
+        if (tile === 'H') {
+          reward = this.rewardHole;
+          done = true;
+        } else if (tile === 'G') {
+          reward = this.rewardGoal;
+          done = true;
+        }
+
+        this.done = done;
+        return {
+          state: this.agentState,
+          reward: reward,
+          done: done,
+          slipped: slipped,
+          tile: tile
+        };
+      }
+    }
+
+    class QLearningAgent {
+      constructor(env) {
+        this.env = env;
+        this.alpha = 0.8;
+        this.gamma = 0.95;
+        this.epsilon = 1.0;
+        this.epsilonDecay = 0.995;
+        this.minEpsilon = 0.01;
+
+        // Statistics
+        this.episodes = 0;
+        this.totalSteps = 0;
+        this.recentSuccesses = []; // window 100
+        this.recentSteps = [];
+        this.successRate = 0;
+        this.avgSteps = 0;
+        this.historySuccess = [];
+
+        this.initQTable();
+      }
+
+      initQTable() {
+        this.Q = [];
+        for (let s = 0; s < this.env.nStates; s++) {
+          this.Q[s] = [0, 0, 0, 0];
+        }
+      }
+
+      resetStats() {
+        this.episodes = 0;
+        this.totalSteps = 0;
+        this.recentSuccesses = [];
+        this.recentSteps = [];
+        this.historySuccess = [];
+        this.epsilon = 1.0;
+        this.initQTable();
+      }
+
+      selectAction(state, forceGreedy = false) {
+        const eps = forceGreedy ? 0 : this.epsilon;
+        if (Math.random() < eps) {
+          return Math.floor(Math.random() * this.env.nActions);
+        }
+        // Greedy: argmax Q(s, a) with random tie breaking
+        const qVals = this.Q[state];
+        let maxVal = -Infinity;
+        let bestActions = [];
+
+        for (let a = 0; a < 4; a++) {
+          if (qVals[a] > maxVal) {
+            maxVal = qVals[a];
+            bestActions = [a];
+          } else if (Math.abs(qVals[a] - maxVal) < 1e-6) {
+            bestActions.push(a);
+          }
+        }
+        return bestActions[Math.floor(Math.random() * bestActions.length)];
+      }
+
+      decayEpsilon() {
+        this.epsilon = Math.max(this.minEpsilon, this.epsilon * this.epsilonDecay);
+      }
+
+      recordEpisode(success, steps) {
+        this.episodes++;
+        this.recentSuccesses.push(success ? 1 : 0);
+        this.recentSteps.push(steps);
+        if (this.recentSuccesses.length > 100) this.recentSuccesses.shift();
+        if (this.recentSteps.length > 100) this.recentSteps.shift();
+
+        const sumSucc = this.recentSuccesses.reduce((a, b) => a + b, 0);
+        this.successRate = (sumSucc / this.recentSuccesses.length) * 100;
+
+        const sumSteps = this.recentSteps.reduce((a, b) => a + b, 0);
+        this.avgSteps = (sumSteps / this.recentSteps.length);
+
+        if (this.episodes % 2 === 0 || this.episodes < 50) {
+          this.historySuccess.push(this.successRate);
+          if (this.historySuccess.length > 160) this.historySuccess.shift();
+        }
+      }
+
+      // Single step Q-learning TD Update
+      trainSingleStep(currentState, action) {
+        const stepResult = this.env.step(action);
+        const sNext = stepResult.state;
+        const r = stepResult.reward;
+        const done = stepResult.done;
+
+        const maxNextQ = done ? 0 : Math.max(...this.Q[sNext]);
+        const tdTarget = r + this.gamma * maxNextQ;
+        const tdError = tdTarget - this.Q[currentState][action];
+        this.Q[currentState][action] += this.alpha * tdError;
+
+        return stepResult;
+      }
+
+      // Fast non-visual simulation for fast bulk training
+      runFastEpisode(maxSteps = 200) {
+        let s = this.env.reset();
+        let steps = 0;
+        let success = false;
+
+        while (steps < maxSteps) {
+          steps++;
+          this.totalSteps++;
+          const a = this.selectAction(s);
+          const res = this.env.step(a);
+          const sNext = res.state;
+          const r = res.reward;
+          const done = res.done;
+
+          const maxNextQ = done ? 0 : Math.max(...this.Q[sNext]);
+          this.Q[s][a] += this.alpha * (r + this.gamma * maxNextQ - this.Q[s][a]);
+
+          s = sNext;
+          if (done) {
+            success = (res.tile === 'G');
+            break;
+          }
+        }
+
+        this.decayEpsilon();
+        this.recordEpisode(success, steps);
+        return { success, steps };
+      }
+    }
+
+    const lakeCanvas = document.getElementById('lakeCanvas');
+    const lakeCtx = lakeCanvas.getContext('2d');
+    const chartCanvas = document.getElementById('chartCanvas');
+    const chartCtx = chartCanvas.getContext('2d');
+
+    // Default permanently set to Classic 8x8 with slippery physics
+    let env = new FrozenLakeEnv(CLASSIC_8X8_MAP, true);
+    let agent = new QLearningAgent(env);
+
+    let inspectedState = 0;
+    let isAutoTraining = false;
+    let autoTrainInterval = null;
+    let animAgentRenderPos = { x: 0, y: 0 };
+    let splashParticles = [];
+    let celebrationParticles = [];
+
+    let isVisualRunning = false;
+    let currentEpisodeSteps = 0;
+
+    function resizeCanvases() {
+      const container = lakeCanvas.parentElement;
+      const size = Math.min(container.clientWidth - 24, 540);
+      lakeCanvas.width = size;
+      lakeCanvas.height = size;
+
+      chartCanvas.width = chartCanvas.parentElement.clientWidth;
+      chartCanvas.height = chartCanvas.parentElement.clientHeight;
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvases();
+      renderAll();
+    });
+
+    function getValueColor(val, minV = 0, maxV = 1) {
+      if (val <= 0.0001) return 'rgba(15, 23, 42, 0.4)';
+      const norm = Math.min(Math.max((val - minV) / (maxV - minV || 1), 0), 1);
+      
+      const r = Math.round(14 + norm * (245 - 14));
+      const g = Math.round(165 + norm * (190 - 165));
+      const b = Math.round(233 - norm * 200);
+      return `rgba(${r}, ${g}, ${b}, ${0.15 + norm * 0.48})`;
+    }
+
+    function renderLake() {
+      const w = lakeCanvas.width;
+      const h = lakeCanvas.height;
+      lakeCtx.clearRect(0, 0, w, h);
+
+      const cellW = w / env.cols;
+      const cellH = h / env.rows;
+
+      let maxOverallQ = 0.001;
+      for (let s = 0; s < env.nStates; s++) {
+        const maxQ = Math.max(...agent.Q[s]);
+        if (maxQ > maxOverallQ) maxOverallQ = maxQ;
+      }
+
+      const showHeatmap = document.getElementById('layer-heatmap').checked;
+      const showArrows = document.getElementById('layer-arrows').checked;
+
+      // Draw Grid Cells
+      for (let r = 0; r < env.rows; r++) {
+        for (let c = 0; c < env.cols; c++) {
+          const x = c * cellW;
+          const y = r * cellH;
+          const s = env.coordToState(r, c);
+          const tile = env.grid[r][c];
+          const maxQ = Math.max(...agent.Q[s]);
+
+          lakeCtx.save();
+          lakeCtx.beginPath();
+          lakeCtx.roundRect(x + 1.5, y + 1.5, cellW - 3, cellH - 3, 6);
+
+          if (tile === 'H') {
+            // Hole Tile
+            const holeGrad = lakeCtx.createRadialGradient(x + cellW / 2, y + cellH / 2, 3, x + cellW / 2, y + cellH / 2, cellW / 2);
+            holeGrad.addColorStop(0, '#020617');
+            holeGrad.addColorStop(0.7, '#082f49');
+            holeGrad.addColorStop(1, '#0f172a');
+            lakeCtx.fillStyle = holeGrad;
+            lakeCtx.fill();
+            lakeCtx.lineWidth = 1.2;
+            lakeCtx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+            lakeCtx.stroke();
+          } else if (tile === 'G') {
+            // Goal Tile
+            const goalGrad = lakeCtx.createLinearGradient(x, y, x + cellW, y + cellH);
+            goalGrad.addColorStop(0, '#064e3b');
+            goalGrad.addColorStop(1, '#065f46');
+            lakeCtx.fillStyle = goalGrad;
+            lakeCtx.fill();
+            lakeCtx.lineWidth = 1.8;
+            lakeCtx.strokeStyle = 'rgba(52, 211, 153, 0.7)';
+            lakeCtx.stroke();
+          } else {
+            // Frozen Surface Tile
+            const iceGrad = lakeCtx.createLinearGradient(x, y, x + cellW, y + cellH);
+            iceGrad.addColorStop(0, '#0f172a');
+            iceGrad.addColorStop(1, '#1e293b');
+            lakeCtx.fillStyle = iceGrad;
+            lakeCtx.fill();
+
+            // Value Heatmap Overlay
+            if (showHeatmap && tile !== 'H' && tile !== 'G') {
+              lakeCtx.fillStyle = getValueColor(maxQ, 0, maxOverallQ);
+              lakeCtx.fill();
+            }
+
+            lakeCtx.lineWidth = (inspectedState === s) ? 2 : 1;
+            lakeCtx.strokeStyle = (inspectedState === s) ? '#38bdf8' : 'rgba(56, 189, 248, 0.16)';
+            lakeCtx.stroke();
+          }
+
+          lakeCtx.restore();
+
+          // Render Tile Icons
+          if (tile === 'H') {
+            lakeCtx.save();
+            lakeCtx.fillStyle = '#f87171';
+            lakeCtx.font = `${Math.max(10, cellW * 0.35)}px sans-serif`;
+            lakeCtx.textAlign = 'center';
+            lakeCtx.textBaseline = 'middle';
+            lakeCtx.fillText('🕳️', x + cellW / 2, y + cellH / 2);
+            lakeCtx.restore();
+          } else if (tile === 'G') {
+            lakeCtx.save();
+            lakeCtx.fillStyle = '#facc15';
+            lakeCtx.font = `${Math.max(10, cellW * 0.42)}px sans-serif`;
+            lakeCtx.textAlign = 'center';
+            lakeCtx.textBaseline = 'middle';
+            lakeCtx.fillText('🏆', x + cellW / 2, y + cellH / 2);
+            lakeCtx.restore();
+          } else if (tile === 'S') {
+            lakeCtx.save();
+            lakeCtx.fillStyle = 'rgba(52, 211, 153, 0.8)';
+            lakeCtx.font = `bold ${Math.max(8, cellW * 0.22)}px monospace`;
+            lakeCtx.textAlign = 'left';
+            lakeCtx.textBaseline = 'top';
+            lakeCtx.fillText('START', x + 3, y + 3);
+            lakeCtx.restore();
+          }
+
+          // Policy Vector Arrows Overlay (Numeric Q-values removed)
+          if (showArrows && tile !== 'H' && tile !== 'G') {
+            drawPolicyArrow(lakeCtx, s, x, y, cellW, cellH, agent.Q[s]);
+          }
+        }
+      }
+
+      // Draw Particles & Agent Character
+      renderParticles(lakeCtx);
+      renderAgent(lakeCtx, cellW, cellH);
+    }
+
+    function drawPolicyArrow(ctx, state, x, y, cw, ch, qVals) {
+      const maxQ = Math.max(...qVals);
+      if (maxQ <= 0.0001) return;
+
+      const bestActions = [];
+      for (let a = 0; a < 4; a++) {
+        if (Math.abs(qVals[a] - maxQ) < 1e-4) {
+          bestActions.push(a);
+        }
+      }
+
+      const cx = x + cw / 2;
+      const cy = y + ch / 2;
+      const arrowLen = Math.min(cw, ch) * 0.28;
+
+      ctx.save();
+      for (const a of bestActions) {
+        ctx.beginPath();
+        let targetX = cx;
+        let targetY = cy;
+
+        if (a === 0) targetX -= arrowLen; // Left
+        else if (a === 1) targetY += arrowLen; // Down
+        else if (a === 2) targetX += arrowLen; // Right
+        else if (a === 3) targetY -= arrowLen; // Up
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = Math.max(1.8, cw * 0.05);
+        ctx.lineCap = 'round';
+
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(targetX, targetY);
+        ctx.stroke();
+
+        const angle = Math.atan2(targetY - cy, targetX - cx);
+        const headlen = Math.max(4, cw * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(targetX, targetY);
+        ctx.lineTo(targetX - headlen * Math.cos(angle - Math.PI / 6), targetY - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(targetX - headlen * Math.cos(angle + Math.PI / 6), targetY - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function renderAgent(ctx, cw, ch) {
+      const targetScreenX = env.agentPos.c * cw + cw / 2;
+      const targetScreenY = env.agentPos.r * ch + ch / 2;
+
+      // Smooth position interpolation
+      animAgentRenderPos.x += (targetScreenX - animAgentRenderPos.x) * 0.38;
+      animAgentRenderPos.y += (targetScreenY - animAgentRenderPos.y) * 0.38;
+
+      const ax = animAgentRenderPos.x;
+      const ay = animAgentRenderPos.y;
+      const radius = Math.min(cw, ch) * 0.34;
+
+      ctx.save();
+
+      // Shadow
+      ctx.beginPath();
+      ctx.ellipse(ax, ay + radius * 0.85, radius * 0.75, radius * 0.28, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fill();
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(ax, ay, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+
+      // White Belly
+      ctx.beginPath();
+      ctx.ellipse(ax, ay + radius * 0.15, radius * 0.65, radius * 0.75, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fill();
+
+      // Eyes
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(ax - radius * 0.3, ay - radius * 0.25, radius * 0.14, 0, Math.PI * 2);
+      ctx.arc(ax + radius * 0.3, ay - radius * 0.25, radius * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reflections
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ax - radius * 0.34, ay - radius * 0.3, radius * 0.05, 0, Math.PI * 2);
+      ctx.arc(ax + radius * 0.26, ay - radius * 0.3, radius * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Beak
+      ctx.beginPath();
+      ctx.moveTo(ax - radius * 0.2, ay - radius * 0.05);
+      ctx.lineTo(ax + radius * 0.2, ay - radius * 0.05);
+      ctx.lineTo(ax, ay + radius * 0.28);
+      ctx.closePath();
+      ctx.fillStyle = '#fb923c';
+      ctx.fill();
+
+      // Red Scarf
+      ctx.beginPath();
+      ctx.ellipse(ax, ay - radius * 0.02, radius * 0.6, radius * 0.16, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#f43f5e';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function createSplash(x, y) {
+      for (let i = 0; i < 22; i++) {
+        splashParticles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.8) * 7,
+          radius: Math.random() * 3.5 + 1.5,
+          color: Math.random() > 0.5 ? '#38bdf8' : '#e0f2fe',
+          alpha: 1.0,
+          decay: Math.random() * 0.04 + 0.02
+        });
+      }
+    }
+
+    function createCelebration(x, y) {
+      const colors = ['#facc15', '#38bdf8', '#34d399', '#f43f5e', '#a855f7'];
+      for (let i = 0; i < 40; i++) {
+        celebrationParticles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.7) * 9,
+          radius: Math.random() * 4 + 2,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1.0,
+          decay: Math.random() * 0.025 + 0.015
+        });
+      }
+    }
+
+    function renderParticles(ctx) {
+      for (let i = splashParticles.length - 1; i >= 0; i--) {
+        const p = splashParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.25;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          splashParticles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (let i = celebrationParticles.length - 1; i >= 0; i--) {
+        const p = celebrationParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.2;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          celebrationParticles.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function renderPerformanceChart() {
+      const w = chartCanvas.width;
+      const h = chartCanvas.height;
+      chartCtx.clearRect(0, 0, w, h);
+
+      chartCtx.save();
+      chartCtx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      chartCtx.lineWidth = 1;
+
+      [0, 50, 100].forEach(pct => {
+        const y = h - (pct / 100) * (h - 16) - 8;
+        chartCtx.beginPath();
+        chartCtx.moveTo(0, y);
+        chartCtx.lineTo(w, y);
+        chartCtx.stroke();
+      });
+
+      const history = agent.historySuccess;
+      if (history.length < 2) {
+        chartCtx.fillStyle = 'rgba(148, 163, 184, 0.5)';
+        chartCtx.font = '11px monospace';
+        chartCtx.textAlign = 'center';
+        chartCtx.fillText('Run training episodes to stream learning curve...', w / 2, h / 2);
+        chartCtx.restore();
+        return;
+      }
+
+      const stepX = w / (history.length - 1);
+      chartCtx.beginPath();
+      chartCtx.lineWidth = 2.5;
+      chartCtx.strokeStyle = '#34d399';
+
+      history.forEach((val, i) => {
+        const x = i * stepX;
+        const y = h - (val / 100) * (h - 18) - 9;
+        if (i === 0) chartCtx.moveTo(x, y);
+        else chartCtx.lineTo(x, y);
+      });
+      chartCtx.stroke();
+
+      chartCtx.lineTo((history.length - 1) * stepX, h);
+      chartCtx.lineTo(0, h);
+      chartCtx.closePath();
+      const fillGrad = chartCtx.createLinearGradient(0, 0, 0, h);
+      fillGrad.addColorStop(0, 'rgba(52, 211, 153, 0.25)');
+      fillGrad.addColorStop(1, 'rgba(52, 211, 153, 0.0)');
+      chartCtx.fillStyle = fillGrad;
+      chartCtx.fill();
+
+      chartCtx.restore();
+    }
+
+    function updateInspectorUI() {
+      const s = inspectedState;
+      const { r, c } = env.stateToCoord(s);
+      const tile = env.grid[r][c];
+      const qVals = agent.Q[s] || [0, 0, 0, 0];
+      const maxQ = Math.max(...qVals);
+
+      document.getElementById('inspect-coord').textContent = `Tile: (${r}, ${c}) | State #${s}`;
+
+      const tileNames = { S: 'Start (S)', F: 'Frozen Ice (F)', H: 'Hole (H)', G: 'Goal (G)' };
+      const tileEl = document.getElementById('inspect-type');
+      tileEl.textContent = tileNames[tile] || tile;
+      if (tile === 'H') tileEl.className = 'font-semibold text-rose-400 ml-1';
+      else if (tile === 'G') tileEl.className = 'font-semibold text-amber-400 ml-1';
+      else tileEl.className = 'font-semibold text-cyan-400 ml-1';
+
+      document.getElementById('inspect-v').textContent = maxQ.toFixed(3);
+
+      let sumExp = 0;
+      const exps = qVals.map(v => {
+        const e = Math.exp(Math.min(v * 4, 20));
+        sumExp += e;
+        return e;
+      });
+      const probs = exps.map(e => (sumExp > 0 ? (e / sumExp) * 100 : 25));
+
+      document.getElementById('q-left-val').textContent = qVals[0].toFixed(3);
+      document.getElementById('q-down-val').textContent = qVals[1].toFixed(3);
+      document.getElementById('q-right-val').textContent = qVals[2].toFixed(3);
+      document.getElementById('q-up-val').textContent = qVals[3].toFixed(3);
+
+      document.getElementById('q-left-prob').textContent = `${Math.round(probs[0])}%`;
+      document.getElementById('q-down-prob').textContent = `${Math.round(probs[1])}%`;
+      document.getElementById('q-right-prob').textContent = `${Math.round(probs[2])}%`;
+      document.getElementById('q-up-prob').textContent = `${Math.round(probs[3])}%`;
+    }
+
+    function updateTopMetrics() {
+      document.getElementById('metric-episodes').textContent = agent.episodes;
+      document.getElementById('metric-success').textContent = `${agent.successRate.toFixed(1)}%`;
+      document.getElementById('metric-avg-steps').textContent = agent.avgSteps.toFixed(1);
+      document.getElementById('metric-epsilon').textContent = agent.epsilon.toFixed(3);
+      document.getElementById('metric-total-steps').textContent = agent.totalSteps;
+      document.getElementById('chart-latest-val').textContent = `${agent.successRate.toFixed(1)}%`;
+    }
+
+    function showSlipAlert() {
+      const badge = document.getElementById('slip-indicator');
+      badge.classList.remove('opacity-0', '-translate-y-2');
+      badge.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        badge.classList.add('opacity-0', '-translate-y-2');
+        badge.classList.remove('opacity-100', 'translate-y-0');
+      }, 650);
+    }
+
+    function renderAll() {
+      renderLake();
+      renderPerformanceChart();
+      updateTopMetrics();
+      updateInspectorUI();
+    }
+
+    function triggerStep(action, isManual = false) {
+      if (env.done) {
+        env.reset();
+        currentEpisodeSteps = 0;
+      }
+
+      currentEpisodeSteps++;
+      agent.totalSteps++;
+
+      let result;
+      if (isManual) {
+        result = env.step(action);
+      } else {
+        result = agent.trainSingleStep(env.agentState, action);
+      }
+
+      if (result.slipped) {
+        sound.playSlip();
+        showSlipAlert();
+      } else {
+        sound.playStep();
+      }
+
+      inspectedState = result.state;
+
+      if (result.done) {
+        const cellW = lakeCanvas.width / env.cols;
+        const cellH = lakeCanvas.height / env.rows;
+        const px = env.agentPos.c * cellW + cellW / 2;
+        const py = env.agentPos.r * cellH + cellH / 2;
+
+        if (result.tile === 'G') {
+          sound.playGoal();
+          createCelebration(px, py);
+          agent.recordEpisode(true, currentEpisodeSteps);
+        } else if (result.tile === 'H') {
+          sound.playHole();
+          createSplash(px, py);
+          agent.recordEpisode(false, currentEpisodeSteps);
+        }
+        agent.decayEpsilon();
+      }
+
+      renderAll();
+      return result;
+    }
+
+    function stepAgentPolicy(forceGreedy = false) {
+      if (env.done) {
+        env.reset();
+        currentEpisodeSteps = 0;
+      }
+      const s = env.agentState;
+      const action = agent.selectAction(s, forceGreedy);
+      return triggerStep(action, false);
+    }
+
+    async function playVisualEpisode(forceGreedy = false) {
+      if (isVisualRunning) return;
+      isVisualRunning = true;
+      document.getElementById('agent-status-tag').textContent = 'Executing';
+      document.getElementById('agent-status-tag').className = 'text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-cyan-950/80 border border-cyan-700/60 text-cyan-400';
+
+      env.reset();
+      currentEpisodeSteps = 0;
+      renderAll();
+
+      const delay = parseInt(document.getElementById('slider-speed').value, 10);
+      let steps = 0;
+
+      while (!env.done && steps < 160 && isVisualRunning) {
+        stepAgentPolicy(forceGreedy);
+        steps++;
+        if (delay > 0) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+
+      isVisualRunning = false;
+      document.getElementById('agent-status-tag').textContent = 'Ready';
+      document.getElementById('agent-status-tag').className = 'text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-emerald-950/80 border border-emerald-700/60 text-emerald-400';
+      renderAll();
+    }
+
+    function toggleAutoTrain() {
+      const trainBtn = document.getElementById('btn-toggle-train');
+      const iconPlay = document.getElementById('icon-train-play');
+      const iconPause = document.getElementById('icon-train-pause');
+      const label = document.getElementById('label-train-btn');
+      const statusTag = document.getElementById('agent-status-tag');
+
+      if (!isAutoTraining) {
+        isAutoTraining = true;
+        trainBtn.classList.replace('from-cyan-600', 'from-amber-600');
+        trainBtn.classList.replace('to-blue-600', 'to-orange-600');
+        iconPlay.classList.add('hidden');
+        iconPause.classList.remove('hidden');
+        label.textContent = 'Pause Training';
+        statusTag.textContent = 'Training...';
+        statusTag.className = 'text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-amber-950/80 border border-amber-700/60 text-amber-400';
+
+        const runBatch = () => {
+          if (!isAutoTraining) return;
+          for (let i = 0; i < 12; i++) {
+            agent.runFastEpisode();
+          }
+          renderAll();
+          autoTrainInterval = requestAnimationFrame(runBatch);
+        };
+        autoTrainInterval = requestAnimationFrame(runBatch);
+      } else {
+        isAutoTraining = false;
+        cancelAnimationFrame(autoTrainInterval);
+        trainBtn.classList.replace('from-amber-600', 'from-cyan-600');
+        trainBtn.classList.replace('to-orange-600', 'to-blue-600');
+        iconPlay.classList.remove('hidden');
+        iconPause.classList.add('hidden');
+        label.textContent = 'Start Auto-Train';
+        statusTag.textContent = 'Ready';
+        statusTag.className = 'text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-emerald-950/80 border border-emerald-700/60 text-emerald-400';
+        renderAll();
+      }
+    }
+
+    function runBatchEpisodes(count) {
+      if (isAutoTraining) toggleAutoTrain();
+      for (let i = 0; i < count; i++) {
+        agent.runFastEpisode();
+      }
+      env.reset();
+      renderAll();
+    }
+
+    function attachEventListeners() {
+      document.getElementById('btn-agent-step').addEventListener('click', () => {
+        sound.init();
+        stepAgentPolicy(false);
+      });
+
+      document.getElementById('btn-run-episode').addEventListener('click', () => {
+        sound.init();
+        playVisualEpisode(false);
+      });
+
+      document.getElementById('btn-test-greedy').addEventListener('click', () => {
+        sound.init();
+        playVisualEpisode(true);
+      });
+
+      document.getElementById('btn-toggle-train').addEventListener('click', () => {
+        sound.init();
+        toggleAutoTrain();
+      });
+
+      document.getElementById('btn-train-100').addEventListener('click', () => runBatchEpisodes(100));
+      document.getElementById('btn-train-500').addEventListener('click', () => runBatchEpisodes(500));
+      document.getElementById('btn-train-1000').addEventListener('click', () => runBatchEpisodes(1000));
+
+      document.getElementById('btn-reset-agent').addEventListener('click', () => {
+        if (isAutoTraining) toggleAutoTrain();
+        isVisualRunning = false;
+        agent.resetStats();
+        env.reset();
+        renderAll();
+      });
+
+      const sliderAlpha = document.getElementById('slider-alpha');
+      sliderAlpha.addEventListener('input', (e) => {
+        agent.alpha = parseFloat(e.target.value);
+        document.getElementById('val-alpha').textContent = agent.alpha.toFixed(2);
+      });
+
+      const sliderGamma = document.getElementById('slider-gamma');
+      sliderGamma.addEventListener('input', (e) => {
+        agent.gamma = parseFloat(e.target.value);
+        document.getElementById('val-gamma').textContent = agent.gamma.toFixed(3);
+      });
+
+      const sliderDecay = document.getElementById('slider-decay');
+      sliderDecay.addEventListener('input', (e) => {
+        agent.epsilonDecay = parseFloat(e.target.value);
+        document.getElementById('val-decay').textContent = agent.epsilonDecay.toFixed(3);
+      });
+
+      const sliderMinEps = document.getElementById('slider-min-eps');
+      sliderMinEps.addEventListener('input', (e) => {
+        agent.minEpsilon = parseFloat(e.target.value);
+        document.getElementById('val-min-eps').textContent = agent.minEpsilon.toFixed(2);
+      });
+
+      document.getElementById('input-rew-goal').addEventListener('change', (e) => {
+        env.rewardGoal = parseFloat(e.target.value);
+      });
+      document.getElementById('input-rew-hole').addEventListener('change', (e) => {
+        env.rewardHole = parseFloat(e.target.value);
+      });
+      document.getElementById('input-rew-step').addEventListener('change', (e) => {
+        env.rewardStep = parseFloat(e.target.value);
+      });
+
+      document.getElementById('btn-reset-hyper').addEventListener('click', () => {
+        sliderAlpha.value = '0.80'; agent.alpha = 0.80;
+        sliderGamma.value = '0.95'; agent.gamma = 0.95;
+        sliderDecay.value = '0.995'; agent.epsilonDecay = 0.995;
+        sliderMinEps.value = '0.01'; agent.minEpsilon = 0.01;
+        document.getElementById('val-alpha').textContent = '0.80';
+        document.getElementById('val-gamma').textContent = '0.95';
+        document.getElementById('val-decay').textContent = '0.995';
+        document.getElementById('val-min-eps').textContent = '0.01';
+      });
+
+      document.getElementById('toggle-slippery').addEventListener('change', (e) => {
+        env.isSlippery = e.target.checked;
+      });
+
+      document.getElementById('btn-export-q').addEventListener('click', () => {
+        const json = JSON.stringify(agent.Q, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'frozen_lake_8x8_q_table.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      ['layer-heatmap', 'layer-arrows'].forEach(id => {
+        document.getElementById(id).addEventListener('change', renderLake);
+      });
+
+      const sliderSpeed = document.getElementById('slider-speed');
+      sliderSpeed.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        document.getElementById('speed-label').textContent = val === 0 ? 'Max (0ms)' : `${val}ms`;
+      });
+
+      const soundBtn = document.getElementById('btn-toggle-sound');
+      const soundOn = document.getElementById('icon-sound-on');
+      const soundOff = document.getElementById('icon-sound-off');
+      soundBtn.addEventListener('click', () => {
+        sound.enabled = !sound.enabled;
+        sound.init();
+        if (sound.enabled) {
+          soundOn.classList.remove('hidden');
+          soundOff.classList.add('hidden');
+        } else {
+          soundOn.classList.add('hidden');
+          soundOff.classList.remove('hidden');
+        }
+      });
+
+      // Canvas Click & Hover: Inspecting
+      lakeCanvas.addEventListener('click', (e) => {
+        const rect = lakeCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cellW = lakeCanvas.width / env.cols;
+        const cellH = lakeCanvas.height / env.rows;
+        const c = Math.floor(x / cellW);
+        const r = Math.floor(y / cellH);
+
+        if (r >= 0 && r < env.rows && c >= 0 && c < env.cols) {
+          inspectedState = env.coordToState(r, c);
+          renderAll();
+        }
+      });
+
+      lakeCanvas.addEventListener('mousemove', (e) => {
+        const rect = lakeCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const cellW = lakeCanvas.width / env.cols;
+        const cellH = lakeCanvas.height / env.rows;
+        const c = Math.floor(x / cellW);
+        const r = Math.floor(y / cellH);
+
+        if (r >= 0 && r < env.rows && c >= 0 && c < env.cols) {
+          inspectedState = env.coordToState(r, c);
+          updateInspectorUI();
+          renderLake();
+        }
+      });
+
+      const moveManual = (action) => {
+        sound.init();
+        triggerStep(action, true);
+      };
+
+      document.getElementById('btn-manual-left').addEventListener('click', () => moveManual(ACTIONS.LEFT));
+      document.getElementById('btn-manual-down').addEventListener('click', () => moveManual(ACTIONS.DOWN));
+      document.getElementById('btn-manual-up').addEventListener('click', () => moveManual(ACTIONS.UP));
+      document.getElementById('btn-manual-right').addEventListener('click', () => moveManual(ACTIONS.RIGHT));
+
+      window.addEventListener('keydown', (e) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+          e.preventDefault();
+        }
+
+        if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveManual(ACTIONS.LEFT);
+        else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') moveManual(ACTIONS.DOWN);
+        else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveManual(ACTIONS.RIGHT);
+        else if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') moveManual(ACTIONS.UP);
+        else if (e.key === ' ') triggerStep(agent.selectAction(env.agentState), false);
+      });
+    }
+
+    window.onload = function() {
+      resizeCanvases();
+      attachEventListeners();
+
+      const cellW = lakeCanvas.width / env.cols;
+      const cellH = lakeCanvas.height / env.rows;
+      animAgentRenderPos = {
+        x: env.startPos.c * cellW + cellW / 2,
+        y: env.startPos.r * cellH + cellH / 2
+      };
+
+      function animLoop() {
+        if (splashParticles.length > 0 || celebrationParticles.length > 0) {
+          renderLake();
+        }
+        requestAnimationFrame(animLoop);
+      }
+      animLoop();
+
+      renderAll();
+    };
+  </script>
+</body>
+</html>
